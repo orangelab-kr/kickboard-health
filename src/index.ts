@@ -1,11 +1,11 @@
 import * as Sentry from '@sentry/node';
 
+import { InternalClient, firestore, logger } from '.';
 import { InternalKickboard, KickboardPermission } from 'openapi-internal-sdk';
 
-import InternalClient from './tools/internalClient';
 import _ from 'lodash';
-import { firestore } from './tools/firestore';
-import logger from './tools/logger';
+
+export * from './tools';
 
 const sleep = (timeout: number) =>
   new Promise((resolve) => setTimeout(resolve, timeout));
@@ -94,7 +94,6 @@ async function getKickboards(
   const kickboards = await kickboardClient.getKickboards({
     take,
     skip,
-    search: 'DE20KP',
   });
 
   return kickboards;

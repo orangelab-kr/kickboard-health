@@ -1,6 +1,6 @@
 import winston from 'winston';
 
-export default winston.createLogger({
+export const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'prod' ? 'info' : 'debug',
   exitOnError: false,
   handleExceptions: true,

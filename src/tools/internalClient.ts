@@ -11,7 +11,7 @@ import {
   PlatformPermission,
 } from 'openapi-internal-sdk';
 
-export default class InternalClient {
+export class InternalClient {
   public static getDiscount(
     permissions?: DiscountPermission[],
     email = 'system@hikick.kr'
