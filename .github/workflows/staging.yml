@@ -1,0 +1,58 @@
+name: Staging Deploy CI
+
+on:
+  push:
+    branches: [stage]
+  pull_request:
+    branches: [stage]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Login to Code Artifact
+        id: login-codeartifact
+        run: echo ::set-output name=CODEARTIFACT_AUTH_TOKEN::$(aws codeartifact get-authorization-token --domain hikick --domain-owner 547032093617 --query authorizationToken --output text --region ap-northeast-1)
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: kickboard-health
+        run: |
+          export PACKAGE_VERSION=$(node -p 'require("./package.json").version')-stage
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest-stage -t $ECR_REGISTRY/$ECR_REPOSITORY:$PACKAGE_VERSION --build-arg CODEARTIFACT_AUTH_TOKEN=${{ steps.login-codeartifact.outputs.CODEARTIFACT_AUTH_TOKEN }} .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$PACKAGE_VERSION
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest-stage
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$PACKAGE_VERSION"
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definitions/staging.json
+          container-name: backend
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+
+      - name: Logout of Amazon ECR
+        if: always()
+        run: docker logout ${{ steps.login-ecr.outputs.registry }}
